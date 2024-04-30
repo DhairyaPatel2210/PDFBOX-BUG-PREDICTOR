@@ -13,6 +13,8 @@ class Miner():
         self.version_list = vl
         self.local_repo_link = rl
     
+    # extracting commits between the starting version to ending version using 
+    # gitpython and local data
     def getCommitsList(self,ft,tt):
         repo = git.Repo(self.local_repo_link)
 
@@ -27,6 +29,8 @@ class Miner():
         
         return commits
 
+    # going through each commit and analyzing each file being affected in 
+    # that commit
     def mineClasses(self):
         for i in range(1,len(self.version_list)):
             
@@ -37,31 +41,33 @@ class Miner():
             
             commits_list = self.getCommitsList(from_tag,to_tag)
 
-            total_file_counter = 0
-            java_file_counter = 0
-            unique_file_counter = 0
+            # iterating over commit list
             for c_hash in commits_list:
+
                 for c in Repository(self.local_repo_link, single=c_hash).traverse_commits():
+                    # iterating over each files being impacted
                     for file in c.modified_files:
-                        total_file_counter+=1
                         class_name = file.filename
                         if class_name.find(".java") != -1:
-                            java_file_counter+=1
                             pattern = r'\bPDFBOX-\d+\b' # regular expression to extract the IssueIds from the commit message
                             issues = re.findall(pattern, c.msg)
                             counter = 0
                             for i in issues:
+                                #  checking the mapped issue is buggy or not
                                 if self.checkBuggy(i) :
                                     counter+=1
 
                             if class_name not in classes_data:
-                                unique_file_counter+=1
                                 classes_data[class_name] = counter
                             else:
                                 classes_data[class_name]+=1            
+          
+            # storing the data into json file so it can be processed efficiently
             file_name = f"{from_tag}-{to_tag}_classes.json"
             self.storeClassesToJson(file_name, classes_data)
 
+    # function checks whether the issue mapped with commit is buggy or not using
+    # beautifulsoup 
     def checkBuggy(self,issueId):
         url = f"https://issues.apache.org/jira/browse/{issueId}"
         response = requests.get(url)
@@ -69,6 +75,7 @@ class Miner():
         typed_value = soup.find(id='type-val').get_text()
         return typed_value.strip() == "Bug"
 
+    # by analyzing json files data generating csv file
     def generateCSV(self, columns):
         for i in range(1,len(self.version_list)):
             f = open(f"./Data/ExtractedClasses/{self.version_list[i-1]}-{self.version_list[i]}_classes.json")
@@ -91,6 +98,7 @@ class Miner():
             data_df = pd.DataFrame(data)
             self.storeDataToCSV(file_name,data_df)  
 
+    # storing the dictionary data to json file
     def storeClassesToJson(self,fileName, data):
         dir = "./Data/ExtractedClasses"
         os.makedirs(dir, exist_ok=True)
@@ -98,16 +106,22 @@ class Miner():
         with open(file_path, "w") as outfile: 
             json.dump(data, outfile)
     
+    # storing the analyzed data to CSV file as training data
     def storeDataToCSV(self, fileName, df):
         dir = "./Data/TrainingData"
         os.makedirs(dir, exist_ok=True)
         file_path = os.path.join(dir, fileName)
         df.to_csv(file_path, mode="a", index=False)
     
-    
 
+# creating object of miner using local cloned repository and version needs to
+# be mined
 miner = Miner("/Users/dhairyapatel/Documents/pdfbox",['2.0.25','2.0.26','2.0.27','2.0.28','2.0.29','2.0.30','2.0.31'])
+
+# it will mine classes and will generate json files
 miner.mineClasses()
+
+# using json files, generate csv file on the mentioned attributes(columns)
 miner.generateCSV(["Name","WMC","LCOM","DIT","CBO","RFC","LCAM","LOC"])
 
 
