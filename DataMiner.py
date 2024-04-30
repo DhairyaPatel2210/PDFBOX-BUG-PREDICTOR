@@ -37,11 +37,16 @@ class Miner():
             
             commits_list = self.getCommitsList(from_tag,to_tag)
 
+            total_file_counter = 0
+            java_file_counter = 0
+            unique_file_counter = 0
             for c_hash in commits_list:
                 for c in Repository(self.local_repo_link, single=c_hash).traverse_commits():
                     for file in c.modified_files:
+                        total_file_counter+=1
                         class_name = file.filename
-                        if class_name.find(".java") != -1 and file.change_type.name=="MODIFY":
+                        if class_name.find(".java") != -1:
+                            java_file_counter+=1
                             pattern = r'\bPDFBOX-\d+\b' # regular expression to extract the IssueIds from the commit message
                             issues = re.findall(pattern, c.msg)
                             counter = 0
@@ -50,10 +55,10 @@ class Miner():
                                     counter+=1
 
                             if class_name not in classes_data:
+                                unique_file_counter+=1
                                 classes_data[class_name] = counter
                             else:
-                                classes_data[class_name]+=1
-                            
+                                classes_data[class_name]+=1            
             file_name = f"{from_tag}-{to_tag}_classes.json"
             self.storeClassesToJson(file_name, classes_data)
 
@@ -78,7 +83,7 @@ class Miner():
                 class_name = f'{row["Name"]}.java' 
                 if class_name in commit_data:
                     data["IsBuggy"].append(1 if commit_data[class_name] > 0 else 0)
-                    row[columns[0]] = f"{row[columns[0]]}_{self.version_list[i]}"
+                    row[columns[0]] = f"{row[columns[0]]}"
                     for key in data.keys():
                         if key != "IsBuggy":
                             data[key].append(row[key])     
@@ -101,10 +106,9 @@ class Miner():
     
     
 
-# ['2.0.25',2.0.26','2.0.27','2.0.28','2.0.29','2.0.30']
-miner = Miner("/Users/dhairyapatel/Documents/pdfbox",['2.0.25','2.0.26','2.0.27','2.0.28','2.0.29','2.0.30'])
+miner = Miner("/Users/dhairyapatel/Documents/pdfbox",['2.0.25','2.0.26','2.0.27','2.0.28','2.0.29','2.0.30','2.0.31'])
 miner.mineClasses()
-miner.generateCSV(["Name","WMC","LCOM","DIT"])
+miner.generateCSV(["Name","WMC","LCOM","DIT","CBO","RFC","LCAM","LOC"])
 
 
 
